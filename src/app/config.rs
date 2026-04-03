@@ -4,8 +4,6 @@ use std::path::PathBuf;
 
 pub type FrameRate = u32;
 
-const RESOURCE_DIR_DEFAULT: &str = "/usr/local/share/projectM";
-
 /// Configuration for the application
 /// Parameters are defined here: https://github.com/projectM-visualizer/projectm/blob/master/src/api/include/projectM-4/parameters.h
 pub struct Config {
@@ -87,12 +85,15 @@ fn default_resource_dir() -> std::path::PathBuf {
 
 impl Default for Config {
     fn default() -> Self {
-        #[cfg(target_os = "macos")]
-        let resource_dir = default_resource_dir(); // points to .app/Contents/Resources
+        let resource_dir = default_resource_dir();
 
-        #[cfg(not(target_os = "macos"))]
-        let resource_dir = std::path::PathBuf::from("/usr/local/share/projectM");
-
+        println!(
+            "Using resource directory: {}",
+            resource_dir
+                .canonicalize()
+                .unwrap_or_else(|_| resource_dir.clone())
+                .display()
+        );
         // Construct paths
         let presets_path = resource_dir.join("presets");
         let textures_path = resource_dir.join("textures");

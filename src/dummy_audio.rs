@@ -1,7 +1,7 @@
-use crate::app::ProjectMWrapped;
+use projectm::core::ProjectM;
 
 #[allow(dead_code)]
-pub fn generate_random_audio_data(pm: &ProjectMWrapped) {
+pub fn generate_random_audio_data(pm: &ProjectM) {
     // Create a Vec<i16> with 1024 elements
     // two channels of 512 samples each
     let mut pcm_data: Vec<i16> = vec![0; 1024];

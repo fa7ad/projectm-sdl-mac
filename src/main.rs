@@ -16,11 +16,11 @@ use confique::Config as ConfiqueConfig;
 /// Need help? Join discord: https://discord.gg/uSSggaMBrv
 struct Settings {
     #[arg(short, long = "config")]
+    #[arg(default_value = "Contents/Resources/config.toml")]
     /// Path to a config file
     config_path: Option<PathBuf>,
 
     #[arg(short, long)]
-    #[arg(default_value = "60")]
     #[arg(env = "PM_FRAME_RATE")]
     /// Frame rate to render at.
     frame_rate: Option<u32>,
@@ -36,32 +36,25 @@ struct Settings {
     texture_path: Option<PathBuf>,
 
     #[arg(short, long)]
-    #[arg(default_value = "1.0")]
     #[arg(env = "PM_BEAT_SENSITIVITY")]
     /// Sensitivity of the beat detection
     beat_sensitivity: Option<f32>,
 
     #[arg(short = 'd', long)]
-    #[arg(default_value = "10")]
     #[arg(env = "PM_PRESET_DURATION")]
     /// Duration (seconds) each preset will play
     preset_duration: Option<f64>,
-    // TODO: Add option for specifying audio device
-    // #[arg(short, long)]
-    // #[arg(env = "PM_AUDIO_INPUT")]
-    // /// Audio input device (name or index)
-    // audio_input: Option<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
             config_path: None,
-            frame_rate: None,
+            frame_rate: Some(60),
             preset_path: None,
             texture_path: None,
-            beat_sensitivity: None,
-            preset_duration: None,
+            beat_sensitivity: Some(1.0),
+            preset_duration: Some(10.0),
         }
     }
 }
@@ -95,7 +88,9 @@ fn load_settings_file(path: Option<PathBuf>) -> Result<Settings, String> {
     if let Some(path) = path {
         // ensure the path exists
         if !path.exists() {
-            return Err(format!("config path invalid: {}", path.display()));
+            // If it's the default path and doesn't exist, just return empty settings
+            // This allows running without a config file if the default is missing
+            return Ok(Settings::default());
         }
         // ensure extention is valid
         match path.extension().and_then(|ext| ext.to_str()) {
@@ -104,7 +99,7 @@ fn load_settings_file(path: Option<PathBuf>) -> Result<Settings, String> {
                 return Err(format!(
                     "invalid config file extension: {:?}",
                     path.extension()
-                ))
+                ));
             }
         }
 
@@ -120,14 +115,7 @@ fn load_settings_file(path: Option<PathBuf>) -> Result<Settings, String> {
     }
 
     // No path, return empty settings
-    return Ok(Settings {
-        config_path: None,
-        frame_rate: None,
-        preset_path: None,
-        texture_path: None,
-        beat_sensitivity: None,
-        preset_duration: None,
-    });
+    return Ok(Settings::default());
 }
 
 fn load_settings() -> Result<Settings, String> {
@@ -137,22 +125,54 @@ fn load_settings() -> Result<Settings, String> {
     // Load file
     let mut settings = load_settings_file(cli.config_path.clone())?;
 
-    // Override file with CLI/env vars/defaults
+    // Override file with CLI/env vars
     settings.apply(&cli);
+
+    // Apply global defaults if still None
+    if settings.frame_rate.is_none() {
+        settings.frame_rate = Some(60);
+    }
+    if settings.beat_sensitivity.is_none() {
+        settings.beat_sensitivity = Some(1.0);
+    }
+    if settings.preset_duration.is_none() {
+        settings.preset_duration = Some(10.0);
+    }
 
     return Ok(settings);
 }
 
 fn main() -> Result<(), String> {
+    // Set the process name before anything else so the macOS menu bar shows
+    // "ProjectM" instead of the binary name "projectm_sdl".
+    #[cfg(target_os = "macos")]
+    {
+        use std::ffi::CString;
+        unsafe extern "C" {
+            fn setprogname(name: *const std::ffi::c_char);
+        }
+        let name = CString::new("ProjectM").unwrap();
+        unsafe { setprogname(name.as_ptr()) };
+    }
+
     let settings = load_settings()?;
 
-    let app_config = Config {
-        frame_rate: settings.frame_rate,
-        preset_path: settings.preset_path,
-        texture_path: settings.texture_path,
-        beat_sensitivity: settings.beat_sensitivity,
-        preset_duration: settings.preset_duration,
-    };
+    let mut app_config = Config::default();
+    if let Some(frame_rate) = settings.frame_rate {
+        app_config.frame_rate = Some(frame_rate);
+    }
+    if let Some(preset_path) = settings.preset_path {
+        app_config.preset_path = Some(preset_path);
+    }
+    if let Some(texture_path) = settings.texture_path {
+        app_config.texture_path = Some(texture_path);
+    }
+    if let Some(beat_sensitivity) = settings.beat_sensitivity {
+        app_config.beat_sensitivity = Some(beat_sensitivity);
+    }
+    if let Some(preset_duration) = settings.preset_duration {
+        app_config.preset_duration = Some(preset_duration);
+    }
 
     // Initialize the application
     let mut app = app::App::new(app_config);
@@ -193,16 +213,19 @@ mod tests {
     }
 
     #[test]
+    #[allow(unsafe_code)]
     fn test_load_env_vars() {
-        std::env::set_var("PM_FRAME_RATE", "60");
-        std::env::set_var("PM_PRESET_PATH", "/home/user/.local/share/projectm/presets");
-        std::env::set_var(
-            "PM_TEXTURE_PATH",
-            "/home/user/.local/share/projectm/textures",
-        );
-        std::env::set_var("PM_BEAT_SENSITIVITY", "1.0");
-        std::env::set_var("PM_PRESET_DURATION", "10.0");
-        std::env::set_var("PM_AUDIO_INPUT", "default");
+        unsafe {
+            std::env::set_var("PM_FRAME_RATE", "60");
+            std::env::set_var("PM_PRESET_PATH", "/home/user/.local/share/projectm/presets");
+            std::env::set_var(
+                "PM_TEXTURE_PATH",
+                "/home/user/.local/share/projectm/textures",
+            );
+            std::env::set_var("PM_BEAT_SENSITIVITY", "1.0");
+            std::env::set_var("PM_PRESET_DURATION", "10.0");
+            std::env::set_var("PM_AUDIO_INPUT", "default");
+        };
 
         // Environment variables are loaded through CLI parsing in clap
         // Create a fake CLI args with no arguments to trigger env var loading
@@ -213,11 +236,13 @@ mod tests {
         assert_settings(res);
 
         // Clean up environment variables
-        std::env::remove_var("PM_FRAME_RATE");
-        std::env::remove_var("PM_PRESET_PATH");
-        std::env::remove_var("PM_TEXTURE_PATH");
-        std::env::remove_var("PM_BEAT_SENSITIVITY");
-        std::env::remove_var("PM_PRESET_DURATION");
-        std::env::remove_var("PM_AUDIO_INPUT");
+        unsafe {
+            std::env::remove_var("PM_FRAME_RATE");
+            std::env::remove_var("PM_PRESET_PATH");
+            std::env::remove_var("PM_TEXTURE_PATH");
+            std::env::remove_var("PM_BEAT_SENSITIVITY");
+            std::env::remove_var("PM_PRESET_DURATION");
+            std::env::remove_var("PM_AUDIO_INPUT");
+        }
     }
 }

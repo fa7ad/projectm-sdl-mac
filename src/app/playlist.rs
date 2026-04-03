@@ -9,14 +9,4 @@ impl App {
         println!("added preset path: {}", preset_path.to_str().unwrap());
         println!("playlist size: {}", self.playlist.len());
     }
-
-    pub fn playlist_play_next(&mut self) {
-        self.playlist.play_next();
-    }
-    pub fn playlist_play_prev(&mut self) {
-        self.playlist.play_prev();
-    }
-    pub fn playlist_play_random(&mut self) {
-        self.playlist.play_random();
-    }
 }

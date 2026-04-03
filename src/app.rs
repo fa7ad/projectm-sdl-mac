@@ -1,12 +1,13 @@
 use crate::app::config::Config;
 use projectm::core::ProjectM;
 use sdl3::video::{GLProfile, WindowPos};
-use std::convert::TryInto;
 use std::rc::Rc;
 
 pub mod audio;
 pub mod config;
 pub mod main_loop;
+#[cfg(target_os = "macos")]
+pub mod menu_bar;
 pub mod playlist;
 pub mod video;
 
@@ -35,12 +36,21 @@ impl App {
         );
         let video_subsystem = sdl_context.video().unwrap();
 
+        // Make SDL's fullscreen toggle (F key) use a borderless covering window
+        // rather than macOS Spaces fullscreen. Native Spaces fullscreen via the
+        // green traffic light is unaffected.
+        #[cfg(target_os = "macos")]
+        sdl3::hint::set(sdl3::hint::names::VIDEO_MAC_FULLSCREEN_SPACES, "0");
+        #[cfg(target_os = "macos")]
+        sdl3::hint::set(sdl3::hint::names::RENDER_DRIVER, "metal");
+
         // request GL version
         // TODO: deal with OpenGL ES here
         let gl_attr = video_subsystem.gl_attr();
         gl_attr.set_context_profile(GLProfile::Core);
         gl_attr.set_context_version(3, 3);
         gl_attr.set_context_flags().debug().set();
+
         assert_eq!(gl_attr.context_profile(), GLProfile::Core);
         assert_eq!(gl_attr.context_version(), (3, 3));
 
@@ -48,6 +58,8 @@ impl App {
         let mut window = video_subsystem
             .window("ProjectM", 1024, 768)
             .opengl()
+            .high_pixel_density()
+            .resizable()
             .build()
             .expect("could not initialize video subsystem");
 
@@ -63,7 +75,7 @@ impl App {
 
         // make window full-size
         let primary_display = video_subsystem.get_primary_display().unwrap();
-        let display_bounds = primary_display.get_usable_bounds().unwrap();
+        let display_bounds = primary_display.get_bounds().unwrap();
         window
             .set_size(display_bounds.width(), display_bounds.height())
             .unwrap();

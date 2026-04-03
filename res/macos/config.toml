@@ -1,0 +1,5 @@
+frame_rate = 120
+preset_duration = 16
+beat_sensitivity = 0.99
+texture_path = "Contents/Resources/textures"
+preset_path = "Contents/Resources/presets"

@@ -1,3 +1,5 @@
+> **Personal build.** This is a fork of the upstream project with personal modifications. It is not intended to be useful for anyone other than me.
+
 <a id="readme-top"></a>
 
 <div align="center">

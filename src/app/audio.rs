@@ -1,10 +1,10 @@
 use projectm::core::ProjectM;
 use sdl3::audio::{AudioDevice, AudioDeviceID, AudioSpec, AudioStreamOwner};
 
-use super::config::FrameRate;
 use super::ProjectMWrapped;
+use super::config::FrameRate;
 
-type SampleFormat = f32; // Format of audio samples
+// type SampleFormat = f32; // Format of audio samples
 const CHANNELS: u32 = 2; // Number of audio channels
 
 pub struct Audio {
@@ -53,7 +53,7 @@ impl Audio {
             println!(
                 " - {} [{}]",
                 device.name().unwrap_or_else(|_| "unknown".to_string()),
-                device.id()
+                device.id().value()
             );
         }
     }
@@ -84,7 +84,13 @@ impl Audio {
             }
         };
 
-        println!("Capturing audio from device {:?}", audio_stream.device_id());
+        println!(
+            "Capturing audio from device {:?} {:?}",
+            audio_stream.device_id().unwrap(),
+            audio_stream
+                .device_name()
+                .unwrap_or_else(|| "unknown".to_string())
+        );
 
         // Get the actual device ID and name from the stream
         let actual_device_id = audio_stream.device_id();
@@ -146,7 +152,9 @@ impl Audio {
         println!(
             "Switching from device '{}' to '{}'",
             current_device_name.unwrap_or_else(|| "unknown".to_string()),
-            next_device_id.name().unwrap_or_else(|_| "unknown".to_string())
+            next_device_id
+                .name()
+                .unwrap_or_else(|_| "unknown".to_string())
         );
 
         // Start capturing from next device
@@ -224,5 +232,21 @@ impl Audio {
 
     pub fn recording_device_name(&self) -> Option<String> {
         self.current_device_name.clone()
+    }
+
+    /// Return all available recording devices as (id, display-name) pairs.
+    pub fn get_recording_devices(&self) -> Vec<(AudioDeviceID, String)> {
+        self.get_device_list()
+            .into_iter()
+            .map(|id| {
+                let name = id.name().unwrap_or_else(|_| "Unknown".to_string());
+                (id, name)
+            })
+            .collect()
+    }
+
+    /// Switch to a specific recording device by its SDL3 AudioDeviceID.
+    pub fn open_device_by_id(&mut self, device_id: AudioDeviceID) {
+        self.begin_audio_recording(Some(device_id));
     }
 }
